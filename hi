@@ -563,7 +563,7 @@ task.spawn(function()
                 warn("Unknown Change_Mode:", mode)
             end
 
-            return
+            consecutiveMatches = 0
         end
     end
 end)
