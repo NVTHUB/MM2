@@ -1,9 +1,17 @@
 getgenv().Config = {
-    ["Enable Auto Hop"] = false,
+    ["Enable Auto Hop"] = true,
     ["Min Coin"] = 250,
-    ["Check Time"] = 120,
-    ["Auto Unbox"] = false,
+    ["Check Time"] = 1800,
+    ["Auto Unbox"] = true,
     ["Selected Box"] = {"Summer2026Box", "Mystery Box 2"},
+    ["Webhook URL"] = "",
+    ["Webhook Rarity Items"] = { "Godly", "Ancient", "Unique", "Legendary", "Rare", "Uncommon", "Common" },
+    ["Webhook Name Items"] = {""},
+    ["Auto_Change"] = true,
+    ["Change_Mode"] = "Farmsyn", -- "Farmsyn" or "FarmV5"
+    ["Folder_From"] = {"359b7f21423e26ae6492bb9d5ebcfe775ab61cbc0e7e00673c3f61170d131186"},
+    ["Folder_To"] = {"458e26fa0161181917e60806004d8c3534e624565c524639efc093449a5b7057"},
+    ["ak_key"] = "",
 }
 -- MM2 FARM + GUI
 -- ================================
@@ -17,6 +25,7 @@ local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
 local Workspace = game:GetService("Workspace")
 local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
@@ -227,7 +236,7 @@ QuestProgress.BorderSizePixel = 0
 QuestProgress.BorderColor3 = Color3.new(0, 0, 0)
 QuestProgress.ZIndex = 999
 QuestProgress.AnchorPoint = Vector2.new(0.5, 0.5)
-QuestProgress.Text = "DailyCoins | WeeklyQuests | Summer2026Box : ??? | ??? | ???"
+QuestProgress.Text = "DAILY | WEEK | BOX : ??? | ??? | ???"
 QuestProgress.TextColor3 = Color3.fromRGB(120, 255, 120)
 QuestProgress.TextSize = 28
 QuestProgress.FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
@@ -248,7 +257,7 @@ Discord.BorderSizePixel = 0
 Discord.BorderColor3 = Color3.new(0, 0, 0)
 Discord.ZIndex = 999
 Discord.AnchorPoint = Vector2.new(0.5, 0.5)
-Discord.Text = "discord.gg/serenityhub"
+Discord.Text = "TANI HUB"
 Discord.TextColor3 = Color3.fromRGB(70, 180, 70)
 Discord.TextSize = 29
 Discord.FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
@@ -286,7 +295,7 @@ Status.BorderSizePixel = 0
 Status.BorderColor3 = Color3.new(0, 0, 0)
 Status.ZIndex = 999
 Status.AnchorPoint = Vector2.new(0.5, 0.5)
-Status.Text = "Trang thai: Dang cho..."
+Status.Text = "Status: Waiting..."
 Status.TextColor3 = Color3.fromRGB(120, 255, 120)
 Status.TextSize = 38
 Status.FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
@@ -345,6 +354,7 @@ local RemotesMisc = Remotes:WaitForChild("Misc")
 local RemotesGameplay = Remotes:WaitForChild("Gameplay")
 local Summer2026Remotes = Remotes:WaitForChild("Events"):WaitForChild("Summer2026Remotes")
 local OpenCrate = Remotes:WaitForChild("Shop"):WaitForChild("OpenCrate")
+local CrateComplete = Remotes:WaitForChild("Shop"):FindFirstChild("CrateComplete")
 
 local QuestProgressData = {
     DailyCoins = nil,
@@ -352,51 +362,13 @@ local QuestProgressData = {
     Summer2026Box = nil,
 }
 
-local QuestLabelPaths = {
-    DailyCoins = { "CrossPlatform", "Summer2026", "Container", "Main", "Quests", "DailyCoins", "ScrollingFrame", "QuestFrame", "Main", "Progress", "Progress", "Progress", "Current", "AmountLabel" },
-    WeeklyQuests = { "CrossPlatform", "Summer2026", "Container", "Main", "Quests", "WeeklyQuests", "ScrollingFrame", "QuestFrame", "Main", "Progress", "Progress", "Progress", "Current", "AmountLabel" },
-    Summer2026Box = { "CrossPlatform", "Summer2026", "Container", "Main", "Quests", "Summer2026Box", "ScrollingFrame", "QuestFrame", "Main", "Progress", "Progress", "Progress", "Current", "AmountLabel" },
-}
-
-local QuestLabelRefs = {}
-local QuestLabelConnections = {}
-
-local function disconnectQuestLabelConnections()
-    for _, conn in ipairs(QuestLabelConnections) do
-        conn:Disconnect()
-    end
-    table.clear(QuestLabelConnections)
-end
-
-local function findByPath(root, path)
-    local current = root
-    for _, name in ipairs(path) do
-        if not current then
-            return nil
-        end
-        current = current:FindFirstChild(name)
-    end
-    return current
-end
-
-local function parseQuestAmount(text)
-    text = tostring(text or "")
-    local direct = tonumber(text)
-    if direct ~= nil then
-        return direct
-    end
-
-    local digits = text:match("(%d+)")
-    return digits and tonumber(digits) or nil
-end
-
 local function refreshQuestProgressText()
     local daily = QuestProgressData.DailyCoins
     local weekly = QuestProgressData.WeeklyQuests
     local box = QuestProgressData.Summer2026Box
 
     QuestProgress.Text = string.format(
-        "DailyCoins | WeeklyQuests | Summer2026Box : %s | %s | %s",
+        "DAILY | WEEK | BOX : %s | %s | %s",
         tostring(daily or "???"),
         tostring(weekly or "???"),
         tostring(box or "???")
@@ -419,7 +391,7 @@ local function applyPlayerData(data)
         return
     end
 
-    local shells = readNested(data, "Materials", "Owned", "SummerKey2026")
+    local shells = tonumber(readNested(data, "Materials", "Owned", "SummerKey2026")) or 0
     local daily = readNested(data, "Summer2026", "Quests", "DailyCoins", "Progress")
     local weekly = readNested(data, "Summer2026", "Quests", "WeeklyQuests", "Progress")
     local box = readNested(data, "Summer2026", "Quests", "Summer2026Box", "Progress")
@@ -447,8 +419,250 @@ local function getPlayerData()
     return ok and type(data) == "table" and data or nil
 end
 
-local function getShellCount(data)
+local function getCoinCount(data)
     return readNested(data, "Materials", "Owned", "Coins")
+end
+
+local function getDiscordImageUrl(image)
+    if not image then
+        return nil
+    end
+
+    local raw = tostring(image)
+    local assetId = raw:match("[?&]id=(%d+)")
+        or raw:match("[?&]assetId=(%d+)")
+        or raw:match("rbxassetid://(%d+)")
+
+    if assetId then
+        return "https://cdn.yummytrackstat.com/asset?assetid=" .. assetId
+    end
+
+    if raw:match("^https://") then
+        return raw
+    end
+end
+
+local function listContains(list, value)
+    if type(list) ~= "table" or value == nil then
+        return false
+    end
+
+    for _, entry in ipairs(list) do
+        if tostring(entry) ~= "" and tostring(entry):lower() == tostring(value):lower() then
+            return true
+        end
+    end
+    return false
+end
+
+local function getItemDatabase()
+    local database = ReplicatedStorage:FindFirstChild("Database")
+    local sync = database and database:FindFirstChild("Sync")
+    local itemModule = sync and sync:FindFirstChild("Item")
+    if not itemModule or not itemModule:IsA("ModuleScript") then
+        return nil
+    end
+
+    local ok, data = pcall(require, itemModule)
+    return ok and type(data) == "table" and data or nil
+end
+
+local function getRequestFunction()
+    return request or http_request or (syn and syn.request)
+end
+
+local function getConfigValue(value)
+    if type(value) == "table" then
+        return value[1]
+    end
+    return value
+end
+
+local function getCrateArguments(boxName)
+    if boxName == "Summer2026Box" then
+        return { "Summer2026Box", "MysteryBox", "SummerKey2026" }
+    end
+
+    if boxName == "Mystery Box 2" then
+        boxName = "MysteryBox2"
+    end
+
+    return { boxName, "MysteryBox", "Coins" }
+end
+
+task.spawn(function()
+    if not Config["Auto_Change"] then
+        return
+    end
+
+    local mode = tostring(Config["Change_Mode"] or "")
+    local consecutiveMatches = 0
+
+    while true do
+        task.wait(120)
+
+        local data = getPlayerData()
+        local shellsValue = readNested(data, "Materials", "Owned", "SummerKey2026")
+        local shells = data and (tonumber(shellsValue) or 0) or nil
+        local claimedSix = readNested(data, "Summer2026", "Quests", "DailyCoins", "Claimed", 6)
+        if claimedSix == nil then
+            claimedSix = readNested(data, "Summer2026", "Quests", "DailyCoins", "Claimed", "6")
+        end
+
+        if shells ~= nil and shells < 120 and claimedSix == true then
+            consecutiveMatches += 1
+        else
+            consecutiveMatches = 0
+        end
+
+        if consecutiveMatches >= 2 then
+            Status.Text = "Status: Change Forder..."
+
+            if mode == "Farmsyn" then
+                local client = getgenv().client
+                local folderFrom = getConfigValue(Config["Folder_From"])
+                local folderTo = getConfigValue(Config["Folder_To"])
+
+                if client and type(client.ChangeToFolder) == "function" and folderFrom and folderTo then
+                    local ok, err = pcall(function()
+                        return client:ChangeToFolder(folderFrom, folderTo, false, nil)
+                    end)
+                    if not ok then
+                        warn("Farmsyn Auto Change failed:", err)
+                    end
+                else
+                    warn("Farmsyn Auto Change missing client or folder config")
+                end
+            elseif mode == "FarmV5" then
+                local apiKey = tostring(Config["ak_key"] or "")
+                local requestFunction = getRequestFunction()
+                if apiKey == "" then
+                    warn("FarmV5 Auto Change skipped: ak_key is empty")
+                elseif not requestFunction then
+                    warn("FarmV5 Auto Change skipped: HTTP request API unavailable")
+                else
+                    local ok, response = pcall(function()
+                        return requestFunction({
+                            Url = "https://accountops.org/api/accounts/autoswap-complete",
+                            Method = "POST",
+                            Headers = {
+                                ["X-Api-Key"] = apiKey,
+                                ["Content-Type"] = "application/json",
+                            },
+                            Body = HttpService:JSONEncode({
+                                username = Player.Name,
+                                option = 1,
+                            }),
+                        })
+                    end)
+                    if not ok then
+                        warn("FarmV5 Auto Change failed:", response)
+                    end
+                end
+            else
+                warn("Unknown Change_Mode:", mode)
+            end
+
+            return
+        end
+    end
+end)
+
+local webhookLastSent = {}
+local function sendWebhookItem(itemId, boxName)
+    local webhookUrl = tostring(Config["Webhook URL"] or "")
+    if webhookUrl == "" then
+        return
+    end
+
+    if webhookLastSent[itemId] and os.clock() - webhookLastSent[itemId] < 3 then
+        return
+    end
+
+    local itemDatabase = getItemDatabase()
+    local metadata = itemDatabase and itemDatabase[itemId]
+    if type(metadata) ~= "table" then
+        warn("Webhook item metadata not found:", itemId)
+        return
+    end
+
+    local itemName = tostring(metadata.ItemName or metadata.Name or itemId)
+    local rarity = tostring(metadata.Rarity or "Unknown")
+    local nameMatch = listContains(Config["Webhook Name Items"], itemName)
+        or listContains(Config["Webhook Name Items"], itemId)
+    local rarityMatch = listContains(Config["Webhook Rarity Items"], rarity)
+    if not nameMatch and not rarityMatch then
+        return
+    end
+
+    webhookLastSent[itemId] = os.clock()
+
+    local requestFunction = getRequestFunction()
+    if not requestFunction then
+        warn("Webhook skipped: HTTP request API is not available")
+        return
+    end
+
+    local embed = {
+        title = itemName,
+        description = string.format(
+            "Rarity: **%s**\nBox: **%s**",
+            rarity,
+            tostring(boxName or "Unknown")
+        ),
+        color = 5793266,
+        footer = {
+            text = "TANI HUB - " .. Player.DisplayName,
+        },
+        timestamp = DateTime.now():ToIsoDate(),
+    }
+
+    local imageUrl = getDiscordImageUrl(metadata.Image)
+    if imageUrl then
+        embed.thumbnail = {
+            url = imageUrl,
+        }
+    end
+
+    local ok, response = pcall(function()
+        return requestFunction({
+            Url = webhookUrl,
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json",
+            },
+            Body = HttpService:JSONEncode({
+                username = "MM2 Inventory Bot",
+                embeds = { embed },
+            }),
+        })
+    end)
+
+    if not ok then
+        warn("Item webhook failed:", response)
+    end
+end
+
+local function handleCrateResult(result, boxName)
+    local itemId
+    if type(result) == "string" then
+        itemId = result
+    elseif type(result) == "table" then
+        itemId = result.ItemID or result.ItemId or result.DataID or result.Name
+    end
+
+    if itemId then
+        task.spawn(sendWebhookItem, tostring(itemId), boxName)
+    end
+end
+
+local lastOpenedBox
+if CrateComplete and CrateComplete:IsA("RemoteEvent") then
+    CrateComplete.OnClientEvent:Connect(function(result)
+        handleCrateResult(result, lastOpenedBox)
+    end)
+else
+    warn("CrateComplete listener unavailable; using inventory diff only")
 end
 
 task.spawn(function()
@@ -458,17 +672,35 @@ task.spawn(function()
     local shellLimit = 120
     local coinLimit = 1000
     local pauseDuration = 10 * 60
+    local lastDataWarning = 0
+
+    if not OpenCrate:IsA("RemoteFunction") then
+        warn("Auto Unbox stopped: Remotes.Shop.OpenCrate is not a RemoteFunction")
+        return
+    end
 
     while true do
         task.wait(10)
 
         if Config["Auto Unbox"] and not Autofarm_Enable and #selectedBoxes > 0 then
             local data = getPlayerData()
-            local shells = tonumber(readNested(data, "Materials", "Owned", "SummerKey2026"))
-            local coins = tonumber(readNested(data, "Materials", "Owned", "Coins"))
+            local shellsValue = readNested(data, "Materials", "Owned", "SummerKey2026")
+            local coinsValue = readNested(data, "Materials", "Owned", "Coins")
+            local shells = data and (tonumber(shellsValue) or 0) or nil
+            local coins = data and tonumber(coinsValue) or nil
             local now = os.clock()
 
-            if not shells or not coins then
+            if not data or not shells or not coins then
+                if now - lastDataWarning >= 30 then
+                    lastDataWarning = now
+                    warn(
+                        "Auto Unbox skipped: missing GetData2 data, SummerKey2026, or Coins",
+                        "Shells =",
+                        shells,
+                        "Coins =",
+                        coins
+                    )
+                end
                 continue
             elseif shells < shellLimit and coins < coinLimit then
                 if now >= pausedUntil then
@@ -487,12 +719,43 @@ task.spawn(function()
                 pausedUntil = 0
                 boxIndex = (boxIndex % #selectedBoxes) + 1
                 local boxName = selectedBoxes[boxIndex]
-                local ok, err = pcall(function()
-                    OpenCrate:InvokeServer(boxName, "MysteryBox", "SummerKey2026")
+                lastOpenedBox = boxName
+                local beforeData = data
+                local crateArguments = getCrateArguments(boxName)
+                local ok, result = pcall(function()
+                    return OpenCrate:InvokeServer(table.unpack(crateArguments))
                 end)
 
                 if not ok then
-                    warn("Auto Unbox error:", err)
+                    warn("Auto Unbox error:", result)
+                else
+                    if result ~= nil then
+                        warn(
+                            "Auto Unbox response:",
+                            result,
+                            "Box:",
+                            boxName,
+                            "Args:",
+                            table.concat(crateArguments, ", ")
+                        )
+                    end
+                    handleCrateResult(result, boxName)
+                    task.delay(1, function()
+                        local afterData = getPlayerData()
+                        if not afterData then
+                            return
+                        end
+
+                        for _, groupName in ipairs({ "Weapons", "Radios", "Perks", "Pets", "Emotes", "Toys" }) do
+                            local beforeOwned = readNested(beforeData, groupName, "Owned") or {}
+                            local afterOwned = readNested(afterData, groupName, "Owned") or {}
+                            for itemId, amount in pairs(afterOwned) do
+                                if tonumber(amount) and tonumber(amount) > (tonumber(beforeOwned[itemId]) or 0) then
+                                    handleCrateResult(itemId, boxName)
+                                end
+                            end
+                        end
+                    end)
                 end
             end
         end
@@ -506,15 +769,21 @@ task.spawn(function()
 
     local checkTime = math.max(1, tonumber(Config["Check Time"]) or 1800)
     local minCoin = math.max(0, tonumber(Config["Min Coin"]) or 250)
-    local sampleInterval = 120
+    local sampleInterval = math.min(120, checkTime)
     local coinHistory = {}
+    local previousCoins
 
     while true do
         local currentTime = os.clock()
         local data = getPlayerData()
-        local currentCoins = tonumber(getShellCount(data))
+        local currentCoins = tonumber(getCoinCount(data))
 
         if currentCoins ~= nil then
+            if previousCoins ~= nil and currentCoins < previousCoins then
+                coinHistory = {}
+            end
+            previousCoins = currentCoins
+
             table.insert(coinHistory, {
                 time = currentTime,
                 coins = currentCoins,
@@ -532,7 +801,7 @@ task.spawn(function()
                 local earnedCoins = currentCoins - oldSample.coins
                 if earnedCoins < minCoin then
                     Status.Text = string.format(
-                        "Trang thai: Auto Hop (%d/%d coin trong %d phut)",
+                        "Status: Auto Hop (%d/%d coin / %d min)",
                         earnedCoins,
                         minCoin,
                         math.floor(checkTime / 60)
@@ -555,50 +824,7 @@ task.spawn(function()
     end
 end)
 
-local function bindQuestLabel(key, path)
-    local obj = findByPath(PlayerGui, path)
-    if not obj or not obj:IsA("TextLabel") then
-        return false
-    end
-
-    QuestLabelRefs[key] = obj
-
-    local function syncFromLabel()
-        local value = parseQuestAmount(obj.Text)
-        if value ~= nil then
-            QuestProgressData[key] = value
-            refreshQuestProgressText()
-        end
-    end
-
-    syncFromLabel()
-    table.insert(QuestLabelConnections, obj:GetPropertyChangedSignal("Text"):Connect(syncFromLabel))
-    return true
-end
-
-local function tryBindQuestLabels()
-    disconnectQuestLabelConnections()
-
-    local foundAll = true
-    for key, path in pairs(QuestLabelPaths) do
-        if not bindQuestLabel(key, path) then
-            foundAll = false
-        end
-    end
-
-    refreshQuestProgressText()
-    return foundAll
-end
-
 refreshQuestProgressText()
-tryBindQuestLabels()
-
-task.spawn(function()
-    while not (QuestLabelRefs.DailyCoins and QuestLabelRefs.WeeklyQuests and QuestLabelRefs.Summer2026Box) do
-        task.wait(0.25)
-        tryBindQuestLabels()
-    end
-end)
 
 task.spawn(function()
     while true do
@@ -610,7 +836,7 @@ task.spawn(function()
             if ok and SecondsPassed and SecondsPassed > 1 then
                 local minutes = math.floor(SecondsPassed / 60)
                 local seconds = SecondsPassed % 60
-                Status.Text = "Trang thai: Cho het van " .. string.format("%02d:%02d", minutes, seconds)
+                Status.Text = "Status: Wait End Game " .. string.format("%02d:%02d", minutes, seconds)
             end
         end
     end
@@ -637,19 +863,18 @@ task.spawn(function()
             return RemotesMisc.GetPlayerProfile:InvokeServer(nickname)
         end)
 
-        local dataOk, playerData = pcall(function()
-            return RemotesExtras.GetData2:InvokeServer()
-        end)
+        local playerData = getPlayerData()
 
-        if dataOk and playerData then
+        if playerData then
             applyPlayerData(playerData)
         end
 
-        if ok and datalevel then
-            local shells = Level:GetAttribute("Shells")
+        local levelValue = datalevel and datalevel.Level or Player:GetAttribute("Level")
+        local shells = Level:GetAttribute("Shells")
+        if levelValue ~= nil or shells ~= nil then
             Level.Text = string.format(
                 "Level: %s | Shells: %s",
-                tostring(datalevel.Level or "???"),
+                tostring(levelValue or "???"),
                 tostring(shells or "???")
             )
         end
@@ -686,7 +911,7 @@ Player.CharacterAdded:Connect(function(char)
     newHumanoid.Died:Connect(function()
         print("Died")
         Autofarm_Enable = false
-        Status.Text = "Trang thai: Da chet, dang cho..."
+        Status.Text = "Status: Wait..."
         Camera.CameraType = OriginalCameraType
         Camera.CameraSubject = OriginalCameraSubject
         task.wait(10)
@@ -700,14 +925,14 @@ local RoundStartEvent = RemotesGameplay:WaitForChild("RoundStart")
 RoundStartEvent.OnClientEvent:Connect(function()
     print("Start event round")
     Autofarm_Enable = true
-    Status.Text = "Trang thai: Dang farm coin..."
+    Status.Text = "Status: Collect Coin..."
 end)
 
 local RoundEndEvent = RemotesGameplay:WaitForChild("RoundEndFade")
 RoundEndEvent.OnClientEvent:Connect(function()
     print("End event round")
     Autofarm_Enable = false
-    Status.Text = "Trang thai: Ket thuc van"
+    Status.Text = "Status: End Game"
     Camera.CameraType = OriginalCameraType
     Camera.CameraSubject = OriginalCameraSubject
     task.wait(5)
@@ -720,10 +945,10 @@ local CoinCollectedEvent = RemotesGameplay:WaitForChild("CoinCollected")
 CoinCollectedEvent.OnClientEvent:Connect(function(_coinType, current, max)
     print(current, max)
     Coin.Text = "Coin: " .. tostring(current) .. " / " .. tostring(max)
-    Status.Text = "Trang thai: Dang nhat coin (" .. tostring(current) .. " / " .. tostring(max) .. ")"
+    Status.Text = "Status: Collect Coin (" .. tostring(current) .. " / " .. tostring(max) .. ")"
     if tonumber(current) == tonumber(max) then
         Autofarm_Enable = false
-        Status.Text = "Trang thai: Da dat toi da coin"
+        Status.Text = "Status: Max Coin"
         if Player.Character and Player.Character:FindFirstChild("Humanoid") then
             Player.Character.Humanoid.Health = 0
         end
