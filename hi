@@ -1,3 +1,10 @@
+getgenv().Config = {
+    ["Enable Auto Hop"] = false,
+    ["Min Coin"] = 250,
+    ["Check Time"] = 120,
+    ["Auto Unbox"] = false,
+    ["Selected Box"] = {"Summer2026Box", "Mystery Box 2"},
+}
 -- MM2 FARM + GUI
 -- ================================
 
@@ -14,6 +21,7 @@ local Workspace = game:GetService("Workspace")
 local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
 local VirtualUser = game:GetService("VirtualUser")
+local TeleportService = game:GetService("TeleportService")
 
 -- ================================
 -- ANTI-AFK
@@ -336,6 +344,7 @@ local RemotesExtras = Remotes:WaitForChild("Extras")
 local RemotesMisc = Remotes:WaitForChild("Misc")
 local RemotesGameplay = Remotes:WaitForChild("Gameplay")
 local Summer2026Remotes = Remotes:WaitForChild("Events"):WaitForChild("Summer2026Remotes")
+local OpenCrate = Remotes:WaitForChild("Shop"):WaitForChild("OpenCrate")
 
 local QuestProgressData = {
     DailyCoins = nil,
@@ -393,6 +402,158 @@ local function refreshQuestProgressText()
         tostring(box or "???")
     )
 end
+
+local function readNested(data, ...)
+    local current = data
+    for _, key in ipairs({ ... }) do
+        if type(current) ~= "table" then
+            return nil
+        end
+        current = current[key]
+    end
+    return current
+end
+
+local function applyPlayerData(data)
+    if type(data) ~= "table" then
+        return
+    end
+
+    local shells = readNested(data, "Materials", "Owned", "SummerKey2026")
+    local daily = readNested(data, "Summer2026", "Quests", "DailyCoins", "Progress")
+    local weekly = readNested(data, "Summer2026", "Quests", "WeeklyQuests", "Progress")
+    local box = readNested(data, "Summer2026", "Quests", "Summer2026Box", "Progress")
+
+    if shells ~= nil then
+        Level:SetAttribute("Shells", shells)
+    end
+    if daily ~= nil then
+        QuestProgressData.DailyCoins = daily
+    end
+    if weekly ~= nil then
+        QuestProgressData.WeeklyQuests = weekly
+    end
+    if box ~= nil then
+        QuestProgressData.Summer2026Box = box
+    end
+
+    refreshQuestProgressText()
+end
+
+local function getPlayerData()
+    local ok, data = pcall(function()
+        return RemotesExtras.GetData2:InvokeServer()
+    end)
+    return ok and type(data) == "table" and data or nil
+end
+
+local function getShellCount(data)
+    return readNested(data, "Materials", "Owned", "Coins")
+end
+
+task.spawn(function()
+    local selectedBoxes = Config["Selected Box"] or {}
+    local boxIndex = 0
+    local pausedUntil = 0
+    local shellLimit = 120
+    local coinLimit = 1000
+    local pauseDuration = 10 * 60
+
+    while true do
+        task.wait(10)
+
+        if Config["Auto Unbox"] and not Autofarm_Enable and #selectedBoxes > 0 then
+            local data = getPlayerData()
+            local shells = tonumber(readNested(data, "Materials", "Owned", "SummerKey2026"))
+            local coins = tonumber(readNested(data, "Materials", "Owned", "Coins"))
+            local now = os.clock()
+
+            if not shells or not coins then
+                continue
+            elseif shells < shellLimit and coins < coinLimit then
+                if now >= pausedUntil then
+                    pausedUntil = now + pauseDuration
+                    warn(string.format(
+                        "Auto Unbox paused: Shells %d/%d, Coins %d/%d",
+                        shells,
+                        shellLimit,
+                        coins,
+                        coinLimit
+                    ))
+                end
+            elseif now < pausedUntil then
+                continue
+            else
+                pausedUntil = 0
+                boxIndex = (boxIndex % #selectedBoxes) + 1
+                local boxName = selectedBoxes[boxIndex]
+                local ok, err = pcall(function()
+                    OpenCrate:InvokeServer(boxName, "MysteryBox", "SummerKey2026")
+                end)
+
+                if not ok then
+                    warn("Auto Unbox error:", err)
+                end
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    if not Config["Enable Auto Hop"] then
+        return
+    end
+
+    local checkTime = math.max(1, tonumber(Config["Check Time"]) or 1800)
+    local minCoin = math.max(0, tonumber(Config["Min Coin"]) or 250)
+    local sampleInterval = 120
+    local coinHistory = {}
+
+    while true do
+        local currentTime = os.clock()
+        local data = getPlayerData()
+        local currentCoins = tonumber(getShellCount(data))
+
+        if currentCoins ~= nil then
+            table.insert(coinHistory, {
+                time = currentTime,
+                coins = currentCoins,
+            })
+
+            local targetTime = currentTime - checkTime
+            local oldSample
+            for _, sample in ipairs(coinHistory) do
+                if sample.time <= targetTime then
+                    oldSample = sample
+                end
+            end
+
+            if oldSample then
+                local earnedCoins = currentCoins - oldSample.coins
+                if earnedCoins < minCoin then
+                    Status.Text = string.format(
+                        "Trang thai: Auto Hop (%d/%d coin trong %d phut)",
+                        earnedCoins,
+                        minCoin,
+                        math.floor(checkTime / 60)
+                    )
+                    pcall(function()
+                        TeleportService:Teleport(game.PlaceId, Player)
+                    end)
+                    return
+                end
+
+                for index = #coinHistory, 1, -1 do
+                    if coinHistory[index].time < oldSample.time then
+                        table.remove(coinHistory, index)
+                    end
+                end
+            end
+        end
+
+        task.wait(sampleInterval)
+    end
+end)
 
 local function bindQuestLabel(key, path)
     local obj = findByPath(PlayerGui, path)
@@ -475,8 +636,22 @@ task.spawn(function()
         local ok, datalevel = pcall(function()
             return RemotesMisc.GetPlayerProfile:InvokeServer(nickname)
         end)
+
+        local dataOk, playerData = pcall(function()
+            return RemotesExtras.GetData2:InvokeServer()
+        end)
+
+        if dataOk and playerData then
+            applyPlayerData(playerData)
+        end
+
         if ok and datalevel then
-            Level.Text = "Level: " .. tostring(datalevel.Level)
+            local shells = Level:GetAttribute("Shells")
+            Level.Text = string.format(
+                "Level: %s | Shells: %s",
+                tostring(datalevel.Level or "???"),
+                tostring(shells or "???")
+            )
         end
         task.wait(120)
     end
