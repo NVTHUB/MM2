@@ -1,17 +1,17 @@
 getgenv().Config = {
     ["Enable Auto Hop"] = true,
-    ["Min Coin"] = 250,
+    ["Min Coin"] = 160,
     ["Check Time"] = 1800,
     ["Auto Unbox"] = true,
-    ["Selected Box"] = {"Summer2026Box", "Mystery Box 2"},
-    ["Webhook URL"] = "",
-    ["Webhook Rarity Items"] = { "Godly", "Ancient", "Unique", "Legendary", "Rare", "Uncommon", "Common" },
+    ["Selected Box"] = {"Summer2026Box", "MysteryBox2"},
+    ["Webhook URL"] = "https://discord.com/api/webhooks/1309932818515755180/2l89h906nyuko-VsgqhVti6wd-qOxBX3L52HugY0FwhDU_b87DV3B0TBEq1IoHBpc1pZ",
+    ["Webhook Rarity Items"] = { "Godly", "Ancient", "Unique" },
     ["Webhook Name Items"] = {""},
     ["Auto_Change"] = true,
-    ["Change_Mode"] = "Farmsyn", -- "Farmsyn" or "FarmV5"
+    ["Change_Mode"] = "FarmV5", -- "Farmsyn" or "FarmV5"
     ["Folder_From"] = {"359b7f21423e26ae6492bb9d5ebcfe775ab61cbc0e7e00673c3f61170d131186"},
     ["Folder_To"] = {"458e26fa0161181917e60806004d8c3534e624565c524639efc093449a5b7057"},
-    ["ak_key"] = "",
+    ["ak_key"] = "ak_2c20a8d7bd758ffbf75b1d9bcdb0a9628a4e2f38212d77acd609b67a92200fcf",
 }
 -- MM2 FARM + GUI
 -- ================================
