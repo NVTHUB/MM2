@@ -1,6 +1,6 @@
 getgenv().Config = {
-    ["Enable Auto Hop"] = false,
-    ["Min Coin"] = 200,
+    ["Enable Auto Hop"] = true,
+    ["Min Coin"] = 160,
     ["Check Time"] = 1800,
     ["Auto Unbox"] = true,
     ["Selected Box"] = {"Summer2026Box", "MysteryBox2"},
@@ -12,7 +12,7 @@ getgenv().Config = {
     ["Folder_From"] = {"359b7f21423e26ae6492bb9d5ebcfe775ab61cbc0e7e00673c3f61170d131186"},
     ["Folder_To"] = {"458e26fa0161181917e60806004d8c3534e624565c524639efc093449a5b7057"},
     ["Folder_Godly"] = {"458e26fa0161181917e60806004d8c3534e624565c524639efc093449a5b7057"},
-    ["API_FarmV5"] = "ak_2c20a8d7bd758ffbf75b1d9bcdb0a9628a4e2f38212d77acd609b67a92200fcf",
+    ["ak_key"] = "ak_2c20a8d7bd758ffbf75b1d9bcdb0a9628a4e2f38212d77acd609b67a92200fcf",
     ["Option_Change"] = 1,
     ["Option_Godly"] = 2,
 }
@@ -459,91 +459,15 @@ local function listContains(list, value)
 end
 
 local function getItemDatabase()
-    if getgenv()._MM2ItemDatabase ~= nil then
-        return getgenv()._MM2ItemDatabase
-    end
-
     local database = ReplicatedStorage:FindFirstChild("Database")
     local sync = database and database:FindFirstChild("Sync")
     local itemModule = sync and sync:FindFirstChild("Item")
     if not itemModule or not itemModule:IsA("ModuleScript") then
-        getgenv()._MM2ItemDatabase = nil
         return nil
     end
 
     local ok, data = pcall(require, itemModule)
-    getgenv()._MM2ItemDatabase = ok and type(data) == "table" and data or nil
-    return getgenv()._MM2ItemDatabase
-end
-
-local function getItemMetadata(itemDatabase, itemId)
-    if type(itemDatabase) ~= "table" then
-        return nil
-    end
-
-    local metadata = itemDatabase[itemId]
-    if type(metadata) == "table" then
-        return metadata
-    end
-
-    metadata = itemDatabase[tostring(itemId)]
-    if type(metadata) == "table" then
-        return metadata
-    end
-
-    local numericId = tonumber(itemId)
-    if numericId ~= nil then
-        metadata = itemDatabase[numericId]
-        if type(metadata) == "table" then
-            return metadata
-        end
-    end
-end
-
-local function hasGodlyInTable(node, itemDatabase, visited)
-    if type(node) ~= "table" then
-        return false
-    end
-
-    visited = visited or {}
-    if visited[node] then
-        return false
-    end
-    visited[node] = true
-
-    local ownedItems = rawget(node, "Owned")
-    if type(ownedItems) == "table" then
-        for itemId, amount in pairs(ownedItems) do
-            if tonumber(amount) and tonumber(amount) > 0 then
-                local metadata = getItemMetadata(itemDatabase, itemId)
-                local rarity = metadata and tostring(metadata.Rarity or "")
-                if rarity:lower() == "godly" then
-                    return true
-                end
-            end
-        end
-    end
-
-    for _, child in pairs(node) do
-        if type(child) == "table" and hasGodlyInTable(child, itemDatabase, visited) then
-            return true
-        end
-    end
-
-    return false
-end
-
-local function accountHasGodlyItem(data, itemDatabase)
-    if type(data) ~= "table" then
-        return false
-    end
-
-    itemDatabase = itemDatabase or getItemDatabase()
-    if type(itemDatabase) ~= "table" then
-        return false
-    end
-
-    return hasGodlyInTable(data, itemDatabase, {})
+    return ok and type(data) == "table" and data or nil
 end
 
 local function getRequestFunction()
@@ -596,13 +520,11 @@ task.spawn(function()
 
         if consecutiveMatches >= 2 then
             Status.Text = "Status: Change Forder..."
-            local itemDatabase = getItemDatabase()
-            local hasGodly = accountHasGodlyItem(data, itemDatabase)
 
             if mode == "Farmsyn" then
                 local client = getgenv().client
                 local folderFrom = getConfigValue(Config["Folder_From"])
-                local folderTo = hasGodly and getConfigValue(Config["Folder_Godly"]) or getConfigValue(Config["Folder_To"])
+                local folderTo = accountHasGodly and getConfigValue(Config["Folder_Godly"]) or getConfigValue(Config["Folder_To"])
 
                 if client and type(client.ChangeToFolder) == "function" and folderFrom and folderTo then
                     local ok, err = pcall(function()
@@ -615,11 +537,11 @@ task.spawn(function()
                     warn("Farmsyn Auto Change missing client or folder config")
                 end
             elseif mode == "FarmV5" then
-                local apiKey = tostring(Config["API_FarmV5"] or "")
-                local option = hasGodly and tonumber(Config["Option_Godly"]) or tonumber(Config["Option_Change"])
+                local apiKey = tostring(Config["ak_key"] or "")
                 local requestFunction = getRequestFunction()
+                local option = accountHasGodly and tonumber(Config["Option_Godly"]) or tonumber(Config["Option_Change"])
                 if apiKey == "" then
-                    warn("FarmV5 Auto Change skipped: API_FarmV5 is empty")
+                    warn("FarmV5 Auto Change skipped: ak_key is empty")
                 elseif not requestFunction then
                     warn("FarmV5 Auto Change skipped: HTTP request API unavailable")
                 else
@@ -651,6 +573,7 @@ task.spawn(function()
 end)
 
 local webhookLastSent = {}
+local accountHasGodly = false
 local function sendWebhookItem(itemId, boxName)
     local webhookUrl = tostring(Config["Webhook URL"] or "")
     if webhookUrl == "" then
@@ -662,7 +585,7 @@ local function sendWebhookItem(itemId, boxName)
     end
 
     local itemDatabase = getItemDatabase()
-    local metadata = getItemMetadata(itemDatabase, itemId)
+    local metadata = itemDatabase and itemDatabase[itemId]
     if type(metadata) ~= "table" then
         warn("Webhook item metadata not found:", itemId)
         return
@@ -670,6 +593,9 @@ local function sendWebhookItem(itemId, boxName)
 
     local itemName = tostring(metadata.ItemName or metadata.Name or itemId)
     local rarity = tostring(metadata.Rarity or "Unknown")
+    if rarity:lower() == "godly" then
+        accountHasGodly = true
+    end
     local nameMatch = listContains(Config["Webhook Name Items"], itemName)
         or listContains(Config["Webhook Name Items"], itemId)
     local rarityMatch = listContains(Config["Webhook Rarity Items"], rarity)
