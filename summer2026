@@ -481,6 +481,37 @@ local function getConfigValue(value)
     return value
 end
 
+local accountHasGodly = false
+
+local function updateAccountHasGodly(data)
+    if type(data) ~= "table" then
+        return accountHasGodly
+    end
+
+    local itemDatabase = getItemDatabase()
+    if type(itemDatabase) ~= "table" then
+        return accountHasGodly
+    end
+
+    for _, groupName in ipairs({ "Weapons", "Radios", "Perks", "Pets", "Emotes", "Toys" }) do
+        local owned = readNested(data, groupName, "Owned")
+        if type(owned) == "table" then
+            for itemId, amount in pairs(owned) do
+                if tonumber(amount) and tonumber(amount) > 0 then
+                    local metadata = itemDatabase[itemId]
+                    local rarity = type(metadata) == "table" and tostring(metadata.Rarity or "") or ""
+                    if rarity:lower() == "godly" then
+                        accountHasGodly = true
+                        return true
+                    end
+                end
+            end
+        end
+    end
+
+    return accountHasGodly
+end
+
 local function getCrateArguments(boxName)
     if boxName == "Summer2026Box" then
         return { "Summer2026Box", "MysteryBox", "SummerKey2026" }
@@ -505,6 +536,7 @@ task.spawn(function()
         task.wait(120)
 
         local data = getPlayerData()
+        updateAccountHasGodly(data)
         local shellsValue = readNested(data, "Materials", "Owned", "SummerKey2026")
         local shells = data and (tonumber(shellsValue) or 0) or nil
         local claimedSix = readNested(data, "Summer2026", "Quests", "DailyCoins", "Claimed", 6)
@@ -573,7 +605,6 @@ task.spawn(function()
 end)
 
 local webhookLastSent = {}
-local accountHasGodly = false
 local function sendWebhookItem(itemId, boxName)
     local webhookUrl = tostring(Config["Webhook URL"] or "")
     if webhookUrl == "" then
