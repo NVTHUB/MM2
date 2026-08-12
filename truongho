@@ -680,7 +680,7 @@ local function sendWebhookItem(itemId, boxName)
         ),
         color = 5793266,
         footer = {
-            text = "⚡ Username - " .. Player.DisplayName,
+            text = "⚡ Username : " .. Player.DisplayName,
         },
         timestamp = DateTime.now():ToIsoDate(),
     }
