@@ -844,7 +844,7 @@ local function unboxOnce(data, boxName)
         return false
     end
     handleCrateResult(result, boxName)
-    task.delay(1, function()
+    task.delay(0.5, function()
         local afterData = getPlayerData(true)
         if not afterData then
             unboxBusy = false
@@ -867,7 +867,7 @@ end
 
 task.spawn(function()
     while true do
-        task.wait(5)
+        task.wait(0.5)
         -- Chỉ mở box khi được bật trong config và autofarm đang tắt.
         if Config["Auto Unbox"] and not Autofarm_Enable then
             local selectedBoxes = Config["Selected Box"] or {}
@@ -938,7 +938,7 @@ task.spawn(function()
     local nextChangeAttempt = 0
 
     while true do
-        task.wait(15)
+        task.wait(2)
         -- Auto Change chỉ kiểm tra khi autofarm đang tắt.
         if Config["Auto_Change"] and os.clock() >= nextChangeAttempt then
             local data = getPlayerData()
@@ -966,7 +966,7 @@ task.spawn(function()
                 -- Nếu đổi thất bại hoặc account vẫn còn online, vòng lặp sẽ thử lại.
                 -- Không dùng kết quả trả về; luôn cho phép thử lại sau 20 giây.
                 changeFolder(folderTo, option)
-                nextChangeAttempt = os.clock() + 15
+                nextChangeAttempt = os.clock() + 30
             end
         end
     end
