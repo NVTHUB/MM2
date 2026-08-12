@@ -844,7 +844,7 @@ local function unboxOnce(data, boxName)
         return false
     end
     handleCrateResult(result, boxName)
-    task.delay(0.5, function()
+    task.delay(1, function()
         local afterData = getPlayerData(true)
         if not afterData then
             unboxBusy = false
@@ -867,7 +867,7 @@ end
 
 task.spawn(function()
     while true do
-        task.wait(0.5)
+        task.wait(5)
         -- Chỉ mở box khi được bật trong config và autofarm đang tắt.
         if Config["Auto Unbox"] and not Autofarm_Enable then
             local selectedBoxes = Config["Selected Box"] or {}
@@ -953,11 +953,11 @@ task.spawn(function()
                 folderTo = Config["Folder_Godly"]
             else
                 -- Không có Godly: cần đủ Level, giới hạn tiền và đã claim quest thứ 6.
-                local shells = tonumber(readNested(data, "Materials", "Owned", "SummerKey2026"))
-                local coins = tonumber(readNested(data, "Materials", "Owned", "Coins"))
+                local shells = tonumber(readNested(data, "Materials", "Owned", "SummerKey2026")) or 0
+                local coins = tonumber(readNested(data, "Materials", "Owned", "Coins")) or 0
                 local claimed = readNested(data, "Summer2026", "Quests", "DailyCoins", "Claimed", 6)
                     or readNested(data, "Summer2026", "Quests", "DailyCoins", "Claimed", "6")
-                shouldChange = shells and coins and getPlayerLevel() >= 10
+                shouldChange = getPlayerLevel() >= 10
                     and shells < 120 and coins < 959 and claimed == true
                 option = tonumber(Config["Option_Change"])
                 folderTo = Config["Folder_To"]
