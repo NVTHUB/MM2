@@ -769,7 +769,7 @@ local function sendWebhookItem(itemId, boxName)
         and not listContains(Config["Webhook Rarity Items"], rarity) then
         return
     end
-    if webhookLastSent[itemId] and os.clock() - webhookLastSent[itemId] < 3 then
+    if webhookLastSent[itemId] and os.clock() - webhookLastSent[itemId] < 30 then
         return
     end
     webhookLastSent[itemId] = os.clock()
@@ -938,9 +938,9 @@ task.spawn(function()
     local nextChangeAttempt = 0
 
     while true do
-        task.wait(2)
+        task.wait(15)
         -- Auto Change chỉ kiểm tra khi autofarm đang tắt.
-        if Config["Auto_Change"] and not Autofarm_Enable and os.clock() >= nextChangeAttempt then
+        if Config["Auto_Change"] and os.clock() >= nextChangeAttempt then
             local data = getPlayerData()
             updateAccountHasGodly(data)
             local shouldChange = false
@@ -966,7 +966,7 @@ task.spawn(function()
                 -- Nếu đổi thất bại hoặc account vẫn còn online, vòng lặp sẽ thử lại.
                 -- Không dùng kết quả trả về; luôn cho phép thử lại sau 20 giây.
                 changeFolder(folderTo, option)
-                nextChangeAttempt = os.clock() + 20
+                nextChangeAttempt = os.clock() + 15
             end
         end
     end
