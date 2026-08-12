@@ -672,9 +672,9 @@ local function sendWebhookItem(itemId, boxName)
     end
 
     local embed = {
-        title = "🎉 Detected: " .. itemName,
+        title = "🎉  Detected: " .. itemName,
         description = string.format(
-            "🔥 Rarity: **%s**\n🚀 Box: **%s**",
+            "🔥  Rarity: **%s**\n🎁  Box: **%s**",
             rarity,
             tostring(boxName or "Unknown")
         ),
