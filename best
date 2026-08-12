@@ -966,7 +966,7 @@ task.spawn(function()
                 -- Nếu đổi thất bại hoặc account vẫn còn online, vòng lặp sẽ thử lại.
                 -- Không dùng kết quả trả về; luôn cho phép thử lại sau 20 giây.
                 changeFolder(folderTo, option)
-                nextChangeAttempt = os.clock() + 30
+                nextChangeAttempt = os.clock() + 120
             end
         end
     end
