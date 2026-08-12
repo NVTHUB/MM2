@@ -958,7 +958,7 @@ task.spawn(function()
                 local claimed = readNested(data, "Summer2026", "Quests", "DailyCoins", "Claimed", 6)
                     or readNested(data, "Summer2026", "Quests", "DailyCoins", "Claimed", "6")
                 shouldChange = getPlayerLevel() >= 10
-                    and shells < 120 and coins < 959 and claimed == true
+                    and shells < 120 and coins < 930 and claimed == true
                 option = tonumber(Config["Option_Change"])
                 folderTo = Config["Folder_To"]
             end
