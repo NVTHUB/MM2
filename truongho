@@ -417,9 +417,10 @@ local function getDiscordImageUrl(image)
     local assetId = raw:match("[?&]id=(%d+)")
         or raw:match("[?&]assetId=(%d+)")
         or raw:match("rbxassetid://(%d+)")
+        or raw:match("rbxthumb://.-[?&]id=(%d+)")
 
     if assetId then
-        return "https://cdn.yummytrackstat.com/asset?assetid=" .. assetId
+        return "https://biggamesapi.io/image/" .. assetId
     end
 
     if raw:match("^https://") then
@@ -671,15 +672,15 @@ local function sendWebhookItem(itemId, boxName)
     end
 
     local embed = {
-        title = itemName,
+        title = "🎉 Detected: " .. itemName,
         description = string.format(
-            "Rarity: **%s**\nBox: **%s**",
+            "🔥 Rarity: **%s**\n🚀 Box: **%s**",
             rarity,
             tostring(boxName or "Unknown")
         ),
         color = 5793266,
         footer = {
-            text = "TANI HUB - " .. Player.DisplayName,
+            text = "⚡ Username - " .. Player.DisplayName,
         },
         timestamp = DateTime.now():ToIsoDate(),
     }
@@ -699,7 +700,7 @@ local function sendWebhookItem(itemId, boxName)
                 ["Content-Type"] = "application/json",
             },
             Body = HttpService:JSONEncode({
-                username = "MM2 Inventory Bot",
+                username = "TANI HUB",
                 embeds = { embed },
             }),
         })
