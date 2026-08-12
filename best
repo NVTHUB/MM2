@@ -1,0 +1,1018 @@
+
+print("Info | Loading script")
+
+Autofarm_Enable = false
+
+-- ================================
+-- CHỐNG AFK: giả lập thao tác để người chơi không bị đá khi đứng yên
+-- ================================
+local function anti_afk()
+    local vu = game:GetService("VirtualUser")
+    game:GetService("Players").LocalPlayer.Idled:connect(function()
+        vu:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+        task.wait(1)
+        vu:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+    end)
+end
+
+-- ================================
+-- NỀN BẢO VỆ: tạo sàn bên dưới để tránh nhân vật rơi khỏi bản đồ
+-- ================================
+local function create_baseplat()
+    local part = Instance.new("Part")
+    part.Size = Vector3.new(100, 1, 100)
+    part.Position = Vector3.new(0, 0.5, 0)
+    part.Anchored = true
+    part.BrickColor = BrickColor.new("Bright green")
+    part.Parent = game.Workspace
+end
+
+anti_afk()
+create_baseplat()
+
+-- ================================
+-- DỊCH VỤ / THÔNG TIN NGƯỜI CHƠI
+-- ================================
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local Lighting = game:GetService("Lighting")
+
+local Camera = workspace.CurrentCamera
+local OriginalCameraType = Camera.CameraType
+local OriginalCameraSubject = Camera.CameraSubject
+
+local nickname = Player.Name
+
+-- ================================
+-- TỐI ƯU HIỆU NĂNG / GIẢM LAG
+-- Không chỉnh sửa coin hoặc các đối tượng bên trong CoinContainer.
+-- ================================
+local function get_coin_container_for_optimization()
+    for _, object in ipairs(Workspace:GetChildren()) do
+        local container = object:FindFirstChild("CoinContainer")
+        if container then
+            return container
+        end
+    end
+    return nil
+end
+
+local function optimizeObjectSafely(object)
+    local coinContainer = get_coin_container_for_optimization()
+
+    if object.Name:find("Coin")
+        or (coinContainer and object:IsDescendantOf(coinContainer)) then
+        return
+    end
+
+    if object:IsA("ParticleEmitter")
+        or object:IsA("Trail")
+        or object:IsA("Light")
+        or object:IsA("Fire")
+        or object:IsA("Smoke")
+        or object:IsA("Sparkles") then
+        object.Enabled = false
+        return
+    end
+
+    if object:IsA("Decal") or object:IsA("Texture") then
+        object.Transparency = 1
+        return
+    end
+
+    if object:IsA("BasePart") then
+        if Player.Character and object:IsDescendantOf(Player.Character) then
+            return
+        end
+
+        -- Giữ lại nền/sàn để nhân vật không bị rơi hoặc treo lơ lửng.
+        local partName = object.Name:lower()
+        local size = object.Size
+        local isNamedGround = partName:find("floor")
+            or partName:find("ground")
+            or partName:find("base")
+            or partName:find("platform")
+            or partName:find("map")
+        local isLargeHorizontalPart = size.X >= 35
+            and size.Z >= 35
+            and size.Y <= math.max(8, math.min(size.X, size.Z) * 0.25)
+
+        if not isNamedGround and not isLargeHorizontalPart then
+            object:Destroy()
+        end
+        return
+    end
+end
+
+task.spawn(function()
+    print("Info | Applying graphics optimizations")
+
+    local regularLobby = Workspace:FindFirstChild("RegularLobby")
+    if regularLobby then
+        regularLobby:Destroy()
+    end
+
+    Lighting.GlobalShadows = false
+    Lighting.FogEnd = 9e9
+
+    for _, effect in ipairs(Lighting:GetChildren()) do
+        if effect:IsA("PostEffect") then
+            effect.Enabled = false
+        end
+    end
+
+    for _, object in ipairs(Workspace:GetDescendants()) do
+        pcall(function()
+            optimizeObjectSafely(object)
+        end)
+    end
+end)
+
+-- ================================
+-- GIAO DIỆN NGƯỜI DÙNG
+-- ================================
+Main = Instance.new("ScreenGui")
+Main.Name = "Main"
+Main.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+Main.Parent = PlayerGui
+Main.ResetOnSpawn = false
+
+Main2 = Instance.new("Frame")
+Main2.Name = "Main"
+Main2.Position = UDim2.new(0.522468, 0, 0.540657, 0)
+Main2.Size = UDim2.new(1.9, 0, 1.5, 0)
+Main2.BackgroundColor3 = Color3.new(0.0509804, 0.0509804, 0.0509804)
+Main2.BorderSizePixel = 0
+Main2.BorderColor3 = Color3.new(0, 0, 0)
+Main2.ZIndex = 999
+Main2.AnchorPoint = Vector2.new(0.5, 0.5)
+Main2.Parent = Main
+
+Bruh = Instance.new("Frame")
+Bruh.Name = "Bruh"
+Bruh.Position = UDim2.new(0.500004, 0, 0.593236, 0)
+Bruh.Size = UDim2.new(0.253962, 0, 0.00409928, 0)
+Bruh.BackgroundColor3 = Color3.new(0.541176, 0.0117647, 0.568627)
+Bruh.BorderSizePixel = 0
+Bruh.BorderColor3 = Color3.new(1, 0.258824, 0.258824)
+Bruh.ZIndex = 999
+Bruh.AnchorPoint = Vector2.new(0.5, 0.5)
+Bruh.Parent = Main2
+
+local UICorner = Instance.new("UICorner")
+UICorner.Name = "UICorner"
+UICorner.CornerRadius = UDim.new(0.4, 0)
+UICorner.Parent = Bruh
+
+Nick = Instance.new("TextLabel")
+Nick.Name = "Nick"
+Nick.Position = UDim2.new(0.500004, 0, 0.375564, 0)
+Nick.Size = UDim2.new(0.0967622, 0, 0.0475519, 0)
+Nick.BackgroundColor3 = Color3.new(1, 1, 1)
+Nick.BackgroundTransparency = 1
+Nick.BorderSizePixel = 0
+Nick.BorderColor3 = Color3.new(0, 0, 0)
+Nick.ZIndex = 999
+Nick.AnchorPoint = Vector2.new(0.5, 0.5)
+Nick.Text = nickname
+Nick.TextColor3 = Color3.new(1, 1, 1)
+Nick.TextSize = 51
+Nick.FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+Nick.TextScaled = true
+Nick.TextWrapped = true
+Nick.Parent = Main2
+
+Bruh2 = Instance.new("Frame")
+Bruh2.Name = "Bruh"
+Bruh2.Position = UDim2.new(0.50012, 0, 0.402209, 0)
+Bruh2.Size = UDim2.new(0.123743, 0, 0.0040993, 0)
+Bruh2.BackgroundColor3 = Color3.new(0.541176, 0.0117647, 0.568627)
+Bruh2.BorderSizePixel = 0
+Bruh2.BorderColor3 = Color3.new(1, 0.258824, 0.258824)
+Bruh2.ZIndex = 999
+Bruh2.AnchorPoint = Vector2.new(0.5, 0.5)
+Bruh2.Parent = Main2
+
+UICorner2 = Instance.new("UICorner")
+UICorner2.Name = "UICorner"
+UICorner2.CornerRadius = UDim.new(0.4, 0)
+UICorner2.Parent = Bruh2
+
+Coin = Instance.new("TextLabel")
+Coin.Name = "Coin"
+Coin.Position = UDim2.new(0.50012, 0, 0.426805, 0)
+Coin.Size = UDim2.new(0.123743, 0, 0.0344341, 0)
+Coin.BackgroundColor3 = Color3.new(1, 1, 1)
+Coin.BackgroundTransparency = 1
+Coin.BorderSizePixel = 0
+Coin.BorderColor3 = Color3.new(0, 0, 0)
+Coin.ZIndex = 999
+Coin.AnchorPoint = Vector2.new(0.5, 0.5)
+Coin.Text = "Coin:  0 / 0"
+Coin.TextColor3 = Color3.new(1, 1, 1)
+Coin.TextSize = 38
+Coin.FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+Coin.TextScaled = true
+Coin.TextWrapped = true
+Coin.Parent = Main2
+
+Level = Instance.new("TextLabel")
+Level.Name = "Level"
+Level.Position = UDim2.new(0.500004, 0, 0.470258, 0)
+Level.Size = UDim2.new(0.0967622, 0, 0.0344341, 0)
+Level.BackgroundColor3 = Color3.new(1, 1, 1)
+Level.BackgroundTransparency = 1
+Level.BorderSizePixel = 0
+Level.BorderColor3 = Color3.new(0, 0, 0)
+Level.ZIndex = 999
+Level.AnchorPoint = Vector2.new(0.5, 0.5)
+Level.Text = "Level: ???"
+Level.TextColor3 = Color3.new(1, 1, 1)
+Level.TextSize = 38
+Level.FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+Level.TextScaled = true
+Level.TextWrapped = true
+Level.Parent = Main2
+
+PassLevel = Instance.new("TextLabel")
+PassLevel.Name = "PassLevel"
+PassLevel.Position = UDim2.new(0.500004, 0, 0.51535, 0)
+PassLevel.Size = UDim2.new(0.0967622, 0, 0.0344341, 0)
+PassLevel.BackgroundColor3 = Color3.new(1, 1, 1)
+PassLevel.BackgroundTransparency = 1
+PassLevel.BorderSizePixel = 0
+PassLevel.BorderColor3 = Color3.new(0, 0, 0)
+PassLevel.ZIndex = 999
+PassLevel.AnchorPoint = Vector2.new(0.5, 0.5)
+PassLevel.Text = "EVENT: ??? | ??? | ???"
+PassLevel.TextColor3 = Color3.new(1, 1, 1)
+PassLevel.TextSize = 38
+PassLevel.FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+PassLevel.TextScaled = true
+PassLevel.TextWrapped = true
+PassLevel.Parent = Main2
+
+Discord = Instance.new("TextLabel")
+Discord.Name = "Discord"
+Discord.Position = UDim2.new(0.392799, 0, 0.57356, 0)
+Discord.Size = UDim2.new(0.0396323, 0, 0.0245958, 0)
+Discord.BackgroundColor3 = Color3.new(0.117647, 0.117647, 0.117647)
+Discord.BackgroundTransparency = 1
+Discord.BorderSizePixel = 0
+Discord.BorderColor3 = Color3.new(0, 0, 0)
+Discord.ZIndex = 999
+Discord.AnchorPoint = Vector2.new(0.5, 0.5)
+Discord.Text = "TANI"
+Discord.TextColor3 = Color3.new(0.294118, 0.294118, 0.294118)
+Discord.TextSize = 29
+Discord.FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+Discord.TextScaled = true
+Discord.TextWrapped = true
+Discord.Parent = Main2
+
+Time = Instance.new("TextLabel")
+Time.Name = "Time"
+Time.Position = UDim2.new(0.500004, 0, 0.557983, 0)
+Time.Size = UDim2.new(0.0967622, 0, 0.0344341, 0)
+Time.BackgroundColor3 = Color3.new(1, 1, 1)
+Time.BackgroundTransparency = 1
+Time.BorderSizePixel = 0
+Time.BorderColor3 = Color3.new(0, 0, 0)
+Time.ZIndex = 999
+Time.AnchorPoint = Vector2.new(0.5, 0.5)
+Time.Text = "Time: ???"
+Time.TextColor3 = Color3.new(1, 1, 1)
+Time.TextSize = 38
+Time.FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+Time.TextScaled = true
+Time.TextWrapped = true
+Time.Parent = Main2
+
+Status = Instance.new("TextLabel")
+Status.Name = "Status"
+Status.Position = UDim2.new(0.499984, 0, 0.625211, 0)
+Status.Size = UDim2.new(0.254002, 0, 0.0442724, 0)
+Status.BackgroundColor3 = Color3.new(1, 1, 1)
+Status.BackgroundTransparency = 1
+Status.BorderSizePixel = 0
+Status.BorderColor3 = Color3.new(0, 0, 0)
+Status.ZIndex = 999
+Status.AnchorPoint = Vector2.new(0.5, 0.5)
+Status.Text = "Status: Waiting..."
+Status.TextColor3 = Color3.new(1, 1, 1)
+Status.TextSize = 38
+Status.FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+Status.TextScaled = true
+Status.TextWrapped = true
+Status.Parent = Main2
+
+-- ================================
+-- NÚT ẨN / HIỆN GIAO DIỆN
+-- (nút luôn hiển thị, kể cả khi Main2 bị ẩn,
+--  vì nút nằm trực tiếp trong "Main", không nằm trong "Main2")
+-- ================================
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Name = "ToggleUI"
+ToggleButton.Size = UDim2.new(0, 110, 0, 36)
+ToggleButton.Position = UDim2.new(0, 10, 0, 10)
+ToggleButton.BackgroundColor3 = Color3.new(0.0509804, 0.0509804, 0.0509804)
+ToggleButton.BorderSizePixel = 0
+ToggleButton.ZIndex = 1000
+ToggleButton.Text = "Hide UI"
+ToggleButton.TextColor3 = Color3.new(1, 1, 1)
+ToggleButton.TextSize = 18
+ToggleButton.Font = Enum.Font.SourceSansBold
+ToggleButton.Parent = Main
+
+local ToggleCorner = Instance.new("UICorner")
+ToggleCorner.CornerRadius = UDim.new(0.2, 0)
+ToggleCorner.Parent = ToggleButton
+
+ToggleButton.MouseButton1Click:Connect(function()
+    Main2.Visible = not Main2.Visible
+    ToggleButton.Text = Main2.Visible and "Hide UI" or "Show UI"
+end)
+
+-- ================================
+-- ĐỒNG HỒ: đếm thời gian đã trôi qua kể từ lúc script khởi chạy
+-- ================================
+task.spawn(function()
+    local SecondsPassed = 0
+    while true do
+        task.wait(1)
+        SecondsPassed += 1
+        local hours = math.floor(SecondsPassed / 3600)
+        local minutes = math.floor((SecondsPassed % 3600) / 60)
+        local seconds = SecondsPassed % 60
+        Time.Text = string.format("%d:%02d:%02d", hours, minutes, seconds)
+    end
+end)
+
+-- ================================
+-- THÔNG TIN MÁY CHỦ: thời gian ván đấu, cấp độ, nhiệm vụ và vật phẩm
+-- ================================
+task.spawn(function()
+    while true do
+        task.wait(1)
+        if Autofarm_Enable == false then
+            local ok, SecondsPassed = pcall(function()
+                return game:GetService("ReplicatedStorage").Remotes.Extras.GetTimer:InvokeServer()
+            end)
+            if ok and SecondsPassed and SecondsPassed > 1 then
+                local minutes = math.floor(SecondsPassed / 60)
+                local seconds = SecondsPassed % 60
+                Status.Text = "Status: Wait End Game " .. string.format("%02d:%02d", minutes, seconds)
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        local ok, datalevel = pcall(function()
+            return game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Misc"):WaitForChild("GetPlayerProfile"):InvokeServer(nickname)
+        end)
+        if ok and datalevel then
+            Level.Text = "Level: " .. tostring(datalevel.Level)
+        end
+        task.wait(120)
+    end
+end)
+
+task.spawn(function()
+    while true do
+        local playerGui = Player:WaitForChild("PlayerGui")
+        local keepGuiName = "Main"
+        for _, gui in pairs(playerGui:GetChildren()) do
+            if gui:IsA("ScreenGui") and gui.Name ~= keepGuiName then
+                gui.Enabled = false
+                gui.ResetOnSpawn = false
+            end
+        end
+        task.wait(60)
+    end
+end)
+
+-- ================================
+-- SỰ KIỆN VÁN ĐẤU: bắt đầu, kết thúc, chết và nhặt coin
+-- ================================
+local Character = Player.Character or Player.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+
+Players.LocalPlayer.CharacterAdded:Connect(function(char)
+    Character = char
+    Humanoid = char:WaitForChild("Humanoid")
+
+    char:WaitForChild("Humanoid").Died:Connect(function()
+        print("Died")
+        Autofarm_Enable = false
+        Status.Text = "Status: Dead, Waiting..."
+        Camera.CameraType = OriginalCameraType
+        Camera.CameraSubject = OriginalCameraSubject
+        task.wait(10)
+        if Player.Character then
+            Player.Character:SetPrimaryPartCFrame(CFrame.new(0, 5, 0))
+        end
+    end)
+end)
+
+local RoundStartEvent = game.ReplicatedStorage.Remotes.Gameplay.RoundStart
+RoundStartEvent.OnClientEvent:Connect(function()
+    print("Start event round")
+    Autofarm_Enable = true
+    Status.Text = "Status: Farming Coins..."
+end)
+
+local RoundEndEvent = game.ReplicatedStorage.Remotes.Gameplay.RoundEndFade
+RoundEndEvent.OnClientEvent:Connect(function()
+    print("End event round")
+    Autofarm_Enable = false
+    Status.Text = "Status: Round Ended"
+    Camera.CameraType = OriginalCameraType
+    Camera.CameraSubject = OriginalCameraSubject
+    task.wait(5)
+    if Player.Character then
+        Player.Character:SetPrimaryPartCFrame(CFrame.new(0, 5, 0))
+    end
+end)
+
+local CoinCollectedEvent = game.ReplicatedStorage.Remotes.Gameplay.CoinCollected
+CoinCollectedEvent.OnClientEvent:Connect(function(cointype, current, max)
+    print(current, max)
+    Coin.Text = "Coin: " .. tostring(current) .. " / " .. tostring(max)
+    Status.Text = "Status: Collecting coin (" .. tostring(current) .. " / " .. tostring(max) .. ")"
+    if tonumber(current) == tonumber(max) then
+        Autofarm_Enable = false
+    Status.Text = "Status: Max Coins"
+        if Player.Character and Player.Character:FindFirstChild("Humanoid") then
+            Player.Character.Humanoid.Health = 0
+        end
+        Camera.CameraType = OriginalCameraType
+        Camera.CameraSubject = OriginalCameraSubject
+    end
+end)
+
+-- ================================
+-- TỰ ĐỘNG NHẶT COIN
+-- ================================
+local attemptedCoins = {}
+local range, coin, tween
+local coinTeleportDelay = 2.5 + math.random() * 0.3
+
+local function GetCoinContainer()
+    for _, v in Workspace:GetChildren() do
+        local CoinContainer = v:FindFirstChild("CoinContainer")
+        if CoinContainer then
+            return CoinContainer
+        end
+    end
+end
+
+local function GetCoin()
+    local CoinContainer = GetCoinContainer()
+    if CoinContainer then
+        local nearestRange, bestCoin = math.huge, nil
+        for _, v in CoinContainer:GetChildren() do
+            if v:FindFirstChild("TouchInterest") and not attemptedCoins[v] then
+                local Magnitude = (Character:GetPivot().Position - v.Position).Magnitude
+                if Magnitude < nearestRange then
+                    nearestRange, bestCoin = Magnitude, v
+                end
+            end
+        end
+        return nearestRange, bestCoin
+    end
+end
+
+local function SetupDescendantRemoving()
+    Workspace.DescendantRemoving:Connect(function(descendant)
+        if descendant == coin or descendant.Parent == coin then
+            if tween then
+                tween:Cancel()
+                tween = nil
+            end
+            attemptedCoins[coin] = nil
+            coin = nil
+        end
+    end)
+end
+
+local function Tick()
+    local success, err = pcall(function()
+        if Character and Character.PrimaryPart then
+            range, coin = GetCoin()
+            if coin then
+                attemptedCoins[coin] = true
+
+                Humanoid.PlatformStand = true
+                Humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+
+                local cameraHeight = 5
+                Camera.CameraType = Enum.CameraType.Scriptable
+                Camera.CFrame = CFrame.new(coin.Position + Vector3.new(0, cameraHeight, 0), coin.Position)
+
+                Character:PivotTo(coin.CFrame + Vector3.new(0, 2, 0))
+                task.wait(coinTeleportDelay)
+            else
+                attemptedCoins = {}
+            end
+        end
+    end)
+
+    if not success then
+        warn("Error:", err)
+    end
+end
+
+SetupDescendantRemoving()
+
+-- ================================
+-- TỰ ĐỘNG MỞ BOX / GỬI WEBHOOK / ĐỔI FOLDER / ĐỔI SERVER
+-- ================================
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+local RemotesExtras = Remotes:WaitForChild("Extras")
+local RemotesMisc = Remotes:WaitForChild("Misc")
+local OpenCrate = Remotes:WaitForChild("Shop"):WaitForChild("OpenCrate")
+local CrateComplete = Remotes:WaitForChild("Shop"):FindFirstChild("CrateComplete")
+
+local accountHasGodly = false
+local lastOpenedBox = nil
+local webhookLastSent = {}
+local teleporting = false
+local unboxBusy = false
+local cachedPlayerData = nil
+local dataRequestInProgress = false
+local autoHopAttempts = 0
+
+local function requestAutoHopTeleport()
+    if teleporting or Autofarm_Enable then
+        return
+    end
+
+    teleporting = true
+    autoHopAttempts += 1
+    local ok, err = pcall(function()
+        TeleportService:Teleport(game.PlaceId, Player)
+    end)
+
+    if not ok then
+        warn("Auto Hop failed; sẽ thử lại:", err)
+        teleporting = false
+        task.delay(math.min(autoHopAttempts * 5, 60), requestAutoHopTeleport)
+    end
+end
+
+-- Khi teleport thất bại, cho phép Auto Hop thử lại ở lần kiểm tra tiếp theo.
+TeleportService.TeleportInitFailed:Connect(function(player)
+    if player == Player then
+        warn("Auto Hop TeleportInitFailed; sẽ thử lại")
+        teleporting = false
+        task.delay(math.min(autoHopAttempts * 5, 60), requestAutoHopTeleport)
+    end
+end)
+
+-- Đọc một giá trị nằm sâu trong bảng dữ liệu GetData2.
+local function readNested(value, ...)
+    local current = value
+    for _, key in ipairs({...}) do
+        if type(current) ~= "table" then
+            return nil
+        end
+        current = current[key]
+    end
+    return current
+end
+
+-- Lấy dữ liệu người chơi từ server.
+-- Nếu lần đầu thất bại, chờ 1 giây rồi thử lại thêm một lần để tránh
+-- dữ liệu lỗi bị hiểu nhầm thành 0.
+local function getPlayerData(forceRefresh)
+    if cachedPlayerData and not forceRefresh then
+        return cachedPlayerData
+    end
+
+    if dataRequestInProgress then
+        return nil
+    end
+
+    dataRequestInProgress = true
+    for attempt = 1, 2 do
+        local ok, data = pcall(function()
+            return RemotesExtras.GetData2:InvokeServer()
+        end)
+
+        if ok and type(data) == "table" then
+            cachedPlayerData = data
+            dataRequestInProgress = false
+            return data
+        end
+
+        if attempt == 1 then
+            task.wait(1)
+        end
+    end
+
+    dataRequestInProgress = false
+    return nil
+end
+
+-- Một luồng cập nhật dữ liệu chung để các tính năng không cùng gọi GetData2.
+task.spawn(function()
+    while true do
+        getPlayerData(true)
+        task.wait(5)
+    end
+end)
+
+-- Chỉ cập nhật GUI khi nội dung DailyCoins thực sự thay đổi.
+task.spawn(function()
+    local startingCoins
+    local lastText
+    while true do
+        local data = cachedPlayerData
+        if data then
+            local dailyCoins = readNested(data, "Summer2026", "Quests", "DailyCoins", "Progress")
+            local currentCoins = tonumber(readNested(data, "Materials", "Owned", "Coins"))
+            if dailyCoins ~= nil and currentCoins ~= nil then
+                startingCoins = startingCoins or currentCoins
+                local text = "EVENT: " .. tostring(dailyCoins)
+                    .. " | " .. tostring(currentCoins - startingCoins)
+                    .. " | " .. tostring(currentCoins)
+                if text ~= lastText then
+                    PassLevel.Text = text
+                    lastText = text
+                end
+            end
+        end
+        task.wait(5)
+    end
+end)
+
+-- Đọc database item của game để lấy tên, độ hiếm và thông tin hiển thị.
+local function getItemDatabase()
+    local database = ReplicatedStorage:FindFirstChild("Database")
+    local sync = database and database:FindFirstChild("Sync")
+    local itemModule = sync and sync:FindFirstChild("Item")
+    if not itemModule or not itemModule:IsA("ModuleScript") then
+        return nil
+    end
+    local ok, data = pcall(require, itemModule)
+    return ok and type(data) == "table" and data or nil
+end
+
+-- Lấy hàm HTTP của executor để gửi webhook hoặc gọi dịch vụ Auto Change.
+local function getRequestFunction()
+    return request or http_request or (syn and syn.request)
+end
+
+-- Chuyển mã asset trong metadata.Image thành URL ảnh dùng cho Discord webhook.
+local function getDiscordImageUrl(image)
+    if not image then
+        return nil
+    end
+
+    local raw = tostring(image)
+    local assetId = raw:match("[?&]id=(%d+)")
+        or raw:match("[?&]assetId=(%d+)")
+        or raw:match("rbxassetid://(%d+)")
+        or raw:match("rbxthumb://.-[?&]id=(%d+)")
+
+    if assetId then
+        return "https://biggamesapi.io/image/" .. assetId
+    end
+
+    if raw:match("^https://") then
+        return raw
+    end
+
+    return nil
+end
+
+-- Kiểm tra một giá trị có nằm trong danh sách cấu hình hay không.
+local function listContains(list, value)
+    if type(list) ~= "table" or value == nil then
+        return false
+    end
+    for _, entry in ipairs(list) do
+        if tostring(entry) ~= "" and tostring(entry):lower() == tostring(value):lower() then
+            return true
+        end
+    end
+    return false
+end
+
+-- Tạo đúng bộ tham số mở box:
+-- Summer2026Box dùng SummerKey2026; các box khác dùng Coins.
+local function getCrateArguments(boxName)
+    if boxName == "Summer2026Box" then
+        return {"Summer2026Box", "MysteryBox", "SummerKey2026"}
+    end
+    if boxName == "Mystery Box 2" then
+        boxName = "MysteryBox2"
+    end
+    return {boxName, "MysteryBox", "Coins"}
+end
+
+-- Duyệt kho đồ để xác định tài khoản đã có Godly.
+-- Một khi đã phát hiện Godly, cờ này giữ nguyên là true trong suốt phiên chạy.
+local function updateAccountHasGodly(data)
+    if accountHasGodly or type(data) ~= "table" then
+        return accountHasGodly
+    end
+    local database = getItemDatabase()
+    if not database then
+        return false
+    end
+    for _, groupName in ipairs({"Weapons", "Radios", "Perks", "Pets", "Emotes", "Toys"}) do
+        local owned = readNested(data, groupName, "Owned")
+        if type(owned) == "table" then
+            for itemId, amount in pairs(owned) do
+                local metadata = database[itemId]
+                if tonumber(amount) and tonumber(amount) > 0
+                    and type(metadata) == "table"
+                    and tostring(metadata.Rarity or ""):lower() == "godly" then
+                    accountHasGodly = true
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
+-- Lọc item theo cấu hình rồi gửi thông tin item đạt điều kiện tới Discord webhook.
+local function sendWebhookItem(itemId, boxName)
+    local url = tostring(Config["Webhook URL"] or "")
+    local database = getItemDatabase()
+    local metadata = database and database[itemId]
+    if url == "" or type(metadata) ~= "table" then
+        return
+    end
+
+    local itemName = tostring(metadata.ItemName or metadata.Name or itemId)
+    local webhookItemName = itemName
+    if metadata.Chroma == true then
+        webhookItemName = "Chroma " .. itemName
+    end
+    local rarity = tostring(metadata.Rarity or "Unknown")
+    if rarity:lower() == "godly" then
+        accountHasGodly = true
+    end
+    if not listContains(Config["Webhook Name Items"], itemName)
+        and not listContains(Config["Webhook Name Items"], itemId)
+        and not listContains(Config["Webhook Rarity Items"], rarity) then
+        return
+    end
+    if webhookLastSent[itemId] and os.clock() - webhookLastSent[itemId] < 3 then
+        return
+    end
+    webhookLastSent[itemId] = os.clock()
+
+    local httpRequest = getRequestFunction()
+    if not httpRequest then
+        return
+    end
+    local embed = {
+        title = "🎉  Detected: " .. webhookItemName,
+        description = string.format("🔥  Rarity: **%s**\n🎁  Box: **%s**", rarity, tostring(boxName or "Unknown")),
+        color = 5793266,
+        footer = {text = "⚡ Username: " .. Player.DisplayName},
+        timestamp = DateTime.now():ToIsoDate(),
+    }
+
+    local imageUrl = getDiscordImageUrl(metadata.Image)
+    if imageUrl then
+        embed.thumbnail = {
+            url = imageUrl,
+        }
+    end
+
+    local ok, response = pcall(function()
+        return httpRequest({
+            Url = url,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode({username = "TANI HUB", embeds = {embed}}),
+        })
+    end)
+    if not ok then
+        warn("Webhook failed:", response)
+    end
+end
+
+-- Lấy itemId từ kết quả OpenCrate và chuyển sang xử lý webhook.
+local function handleCrateResult(result, boxName)
+    local itemId
+    if type(result) == "string" then
+        itemId = result
+    elseif type(result) == "table" then
+        itemId = result.ItemID or result.ItemId or result.DataID or result.Name
+    end
+    if itemId then
+        task.spawn(sendWebhookItem, tostring(itemId), boxName)
+    end
+end
+
+if CrateComplete and CrateComplete:IsA("RemoteEvent") then
+    -- Đây là cách nhận kết quả mở box trực tiếp từ server.
+    CrateComplete.OnClientEvent:Connect(function(result)
+        handleCrateResult(result, lastOpenedBox)
+    end)
+end
+
+-- Mở một box, sau đó so sánh kho đồ trước và sau để tìm item mới.
+local function unboxOnce(data, boxName)
+    if unboxBusy then
+        return false
+    end
+    unboxBusy = true
+    local beforeData = data
+    local args = getCrateArguments(boxName)
+    lastOpenedBox = boxName
+    local ok, result = pcall(function()
+        return OpenCrate:InvokeServer(table.unpack(args))
+    end)
+    if not ok then
+        warn("Auto Unbox failed:", result)
+        unboxBusy = false
+        return false
+    end
+    handleCrateResult(result, boxName)
+    task.delay(1, function()
+        local afterData = getPlayerData(true)
+        if not afterData then
+            unboxBusy = false
+            return
+        end
+        for _, groupName in ipairs({"Weapons", "Radios", "Perks", "Pets", "Emotes", "Toys"}) do
+            local beforeOwned = readNested(beforeData, groupName, "Owned") or {}
+            local afterOwned = readNested(afterData, groupName, "Owned") or {}
+            for itemId, amount in pairs(afterOwned) do
+                if tonumber(amount) and tonumber(amount) > (tonumber(beforeOwned[itemId]) or 0) then
+                    handleCrateResult(itemId, boxName)
+                end
+            end
+        end
+        updateAccountHasGodly(afterData)
+        unboxBusy = false
+    end)
+    return true
+end
+
+task.spawn(function()
+    while true do
+        task.wait(5)
+        -- Chỉ mở box khi được bật trong config và autofarm đang tắt.
+        if Config["Auto Unbox"] and not Autofarm_Enable then
+            local selectedBoxes = Config["Selected Box"] or {}
+            if #selectedBoxes > 0 then
+                local data = getPlayerData()
+                local shells = tonumber(readNested(data, "Materials", "Owned", "SummerKey2026")) or 0
+                local coins = tonumber(readNested(data, "Materials", "Owned", "Coins")) or 0
+                local availableBoxes = {}
+                for _, candidateBox in ipairs(selectedBoxes) do
+                    local canOpen = (candidateBox == "Summer2026Box" and shells >= 120)
+                        or (candidateBox ~= "Summer2026Box" and coins >= 1000)
+                    if canOpen then
+                        table.insert(availableBoxes, candidateBox)
+                    end
+                end
+                if #availableBoxes > 0 then
+                    local boxName = availableBoxes[math.random(1, #availableBoxes)]
+                    unboxOnce(data, boxName)
+                else
+                    Status.Text = "Status: No Box Can Open"
+                end
+            end
+        end
+    end
+end)
+
+local function getPlayerLevel()
+    local ok, profile = pcall(function()
+        return RemotesMisc.GetPlayerProfile:InvokeServer(nickname)
+    end)
+    if ok and profile and profile.Level then
+        return tonumber(profile.Level) or 0
+    end
+    return tonumber(Player:GetAttribute("Level")) or 0
+end
+
+-- Gọi cơ chế đổi folder theo mode Farmsyn hoặc FarmV5.
+-- Hàm trả về thành công/thất bại để vòng lặp có thể thử lại.
+local function changeFolder(folderTo, option)
+    local folderFrom = Config["Folder_From"]
+    local mode = tostring(Config["Change_Mode"] or "")
+    if type(folderFrom) == "table" then folderFrom = folderFrom[1] end
+    if type(folderTo) == "table" then folderTo = folderTo[1] end
+    if mode == "Farmsyn" then
+        local client = getgenv().client
+        if client and type(client.ChangeToFolder) == "function" then
+            return pcall(function()
+                return client:ChangeToFolder(folderFrom, folderTo, false, nil)
+            end)
+        end
+        return false, "Farmsyn client unavailable"
+    elseif mode == "FarmV5" then
+        local httpRequest = getRequestFunction()
+        local ok, response = pcall(function()
+            return httpRequest({
+                Url = "https://accountops.org/api/accounts/autoswap-complete",
+                Method = "POST",
+                Headers = {['X-Api-Key'] = tostring(Config["ak_key"] or ""), ["Content-Type"] = "application/json"},
+                Body = HttpService:JSONEncode({username = Player.Name, option = option}),
+            })
+        end)
+        return ok, response
+    end
+    return false, "Unknown Change_Mode"
+end
+
+task.spawn(function()
+    local nextChangeAttempt = 0
+
+    while true do
+        task.wait(2)
+        -- Auto Change chỉ kiểm tra khi autofarm đang tắt.
+        if Config["Auto_Change"] and not Autofarm_Enable and os.clock() >= nextChangeAttempt then
+            local data = getPlayerData()
+            updateAccountHasGodly(data)
+            local shouldChange = false
+            local option
+            local folderTo
+            if accountHasGodly then
+                -- Có Godly: chỉ cần đạt Level 10 là đổi theo folder Godly.
+                shouldChange = getPlayerLevel() >= 10
+                option = tonumber(Config["Option_Godly"])
+                folderTo = Config["Folder_Godly"]
+            else
+                -- Không có Godly: cần đủ Level, giới hạn tiền và đã claim quest thứ 6.
+                local shells = tonumber(readNested(data, "Materials", "Owned", "SummerKey2026"))
+                local coins = tonumber(readNested(data, "Materials", "Owned", "Coins"))
+                local claimed = readNested(data, "Summer2026", "Quests", "DailyCoins", "Claimed", 6)
+                    or readNested(data, "Summer2026", "Quests", "DailyCoins", "Claimed", "6")
+                shouldChange = shells and coins and getPlayerLevel() >= 10
+                    and shells < 120 and coins < 959 and claimed == true
+                option = tonumber(Config["Option_Change"])
+                folderTo = Config["Folder_To"]
+            end
+            if shouldChange then
+                -- Nếu đổi thất bại hoặc account vẫn còn online, vòng lặp sẽ thử lại.
+                -- Không dùng kết quả trả về; luôn cho phép thử lại sau 20 giây.
+                changeFolder(folderTo, option)
+                nextChangeAttempt = os.clock() + 20
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    if not Config["Enable Auto Hop"] then return end
+    local checkTime = math.max(1, tonumber(Config["Check Time"]) or 1800)
+    local minCoin = math.max(0, tonumber(Config["Min Coin"]) or 250)
+    local history = {}
+    local previousCoins
+    while true do
+        
+        -- Lưu số coin theo thời gian; nếu kiếm được dưới mức tối thiểu thì đổi server.
+        local data = getPlayerData()
+        local coins = tonumber(readNested(data, "Materials", "Owned", "Coins"))
+        local now = os.clock()
+            if coins ~= nil then
+                if previousCoins and coins < previousCoins then
+                    history = {}
+                end
+                previousCoins = coins
+                table.insert(history, {time = now, coins = coins})
+                local old
+                for _, sample in ipairs(history) do
+                    if sample.time <= now - checkTime then old = sample end
+                end
+                if not Autofarm_Enable and old and coins - old.coins < minCoin and not teleporting then
+                    requestAutoHopTeleport()
+                    return
+                end
+
+                if old then
+                    for index = #history, 1, -1 do
+                        if history[index].time < old.time then
+                            table.remove(history, index)
+                        end
+                    end
+                end
+        end
+        task.wait(math.min(120, checkTime))
+    end
+end)
+
+while task.wait() do
+    if Autofarm_Enable == true then
+        Tick()
+    end
+end
