@@ -287,61 +287,47 @@ end
 
 -- KIEM TRA XEM CO DANG O NHA KHONG
 local function check_if_inside_home()
+    -- Wait for character to load first
     local player = game.Players.LocalPlayer
-    local function is_inside_home()
+    local character = player.Character or player.CharacterAdded:Wait()
+    
+    -- Wait for humanoid
+    if not character:FindFirstChild("Humanoid") then
+        character:WaitForChild("Humanoid")
+    end
+    
+    for attempt = 1, 3 do
         local houseInteriors = workspace:FindFirstChild("HouseInteriors")
         local blueprint = houseInteriors and houseInteriors:FindFirstChild("blueprint")
-        return blueprint and blueprint:FindFirstChild(player.Name) ~= nil
-    end
+        local playerHouse = blueprint and blueprint:FindFirstChild(game.Players.LocalPlayer.Name)
 
-    -- Linux/VM có thể load character và HouseInteriors chậm; chờ tổng cộng tối đa 60 giây.
-    local deadline = os.clock() + 60
-    while os.clock() < deadline do
-        local character = player.Character
-        if character and character:FindFirstChild("Humanoid") and is_inside_home() then
+        if playerHouse then
             print("🏠 I'm home!")
             return true
-        end
+        else
+            print("🔄 Not home, attempt " .. attempt)
 
-        task.wait(1)
-    end
-
-    -- Nếu chưa vào nhà, thử spawn lại rồi chờ lâu hơn để tránh kick nhầm khi load chậm.
-    for attempt = 1, 5 do
-        print("🔄 Not home, spawn attempt " .. attempt)
-        local api = game:GetService("ReplicatedStorage"):FindFirstChild("API")
-        local remoteName = attempt < 5 and "TeamAPI/ChooseTeam" or "TeamAPI/Spawn"
-        local remote = api and api:FindFirstChild(remoteName)
-
-        if remote then
             local success, err = pcall(function()
-                if attempt < 5 then
-                    remote:InvokeServer("Parents", { ["source_for_logging"] = "intro_sequence" })
+                if attempt < 3 then
+                    game:GetService("ReplicatedStorage"):WaitForChild("API"):WaitForChild("TeamAPI/ChooseTeam"):InvokeServer("Parents", { ["source_for_logging"] = "intro_sequence" })
+                    task.wait(8)
                 else
-                    remote:InvokeServer()
+                    game:GetService("ReplicatedStorage"):WaitForChild("API"):WaitForChild("TeamAPI/Spawn"):InvokeServer()
+                    task.wait(8)
                 end
             end)
+            
             if not success then
                 warn("Failed to change team/spawn on attempt " .. attempt .. ": " .. tostring(err))
             end
-        else
-            warn("Missing remote: " .. remoteName)
-        end
 
-        local retryDeadline = os.clock() + 30
-        while os.clock() < retryDeadline do
-            if is_inside_home() then
-                print("🏠 I'm home!")
-                return true
+            if attempt == 3 then
+                print("🚪 Kicking player... still not home after 3 tries 😞")
+                game.Players.LocalPlayer:Kick("❌ Not home after 3 tries.")
+                return false
             end
-            task.wait(1)
         end
     end
-
-    -- Chỉ kick sau khoảng 3.5 phút liên tục không vào được nhà.
-    warn("⚠️ Không thể xác nhận đang ở trong nhà sau nhiều lần thử, kick để tránh treo acc.")
-    player:Kick("❌ Không vào được nhà sau thời gian chờ dài.")
-    return false
 end
 
 -- LAY KIEU BAN DO HIEN TAI
