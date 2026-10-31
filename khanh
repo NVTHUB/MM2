@@ -355,7 +355,7 @@ local function featureAutoOpen()
                     table.insert(normal, name)
                 end
             end
-            if coins < 1000 or #normal == 0 then
+            if coins < 00 or #normal == 0 then
                 return
             end
             boxName = normal[math.random(1, #normal)]
@@ -392,7 +392,7 @@ local function featureAutoChange()
         end
     end
     FeatureCache.Level = level
-    if level < 10 then
+    if level < 15 then
         return
     end
 
